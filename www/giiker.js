@@ -13,7 +13,7 @@ const U = 3;
 const R = 4;
 const F = 5;
 
-const faces = ["B", "D", "L", "U", "R", "F"];
+const faces = ["F", "U", "L", "D", "R", "B"];
 
 // color indices
 const b = 0;
@@ -23,7 +23,7 @@ const w = 3;
 const r = 4;
 const g = 5;
 
-const colors = ["blue", "yellow", "orange", "white", "red", "green"];
+const colors = ["green", "white", "orange", "yellow", "red", "blue"];
 
 const turns = {
   0: 1,
@@ -32,57 +32,13 @@ const turns = {
   8: -2
 };
 
-const cornerColors = [
-  [y, r, g],
-  [r, w, g],
-  [w, o, g],
-  [o, y, g],
-  [r, y, b],
-  [w, r, b],
-  [o, w, b],
-  [y, o, b]
-];
+const cornerColors = [[y, r, g], [r, w, g], [w, o, g], [o, y, g], [r, y, b], [w, r, b], [o, w, b], [y, o, b]];
 
-const cornerLocations = [
-  [D, R, F],
-  [R, U, F],
-  [U, L, F],
-  [L, D, F],
-  [R, D, B],
-  [U, R, B],
-  [L, U, B],
-  [D, L, B]
-];
+const cornerLocations = [[D, R, F], [R, U, F], [U, L, F], [L, D, F], [R, D, B], [U, R, B], [L, U, B], [D, L, B]];
 
-const edgeLocations = [
-  [F, D],
-  [F, R],
-  [F, U],
-  [F, L],
-  [D, R],
-  [U, R],
-  [U, L],
-  [D, L],
-  [B, D],
-  [B, R],
-  [B, U],
-  [B, L]
-];
+const edgeLocations = [[F, D], [F, R], [F, U], [F, L], [D, R], [U, R], [U, L], [D, L], [B, D], [B, R], [B, U], [B, L]];
 
-const edgeColors = [
-  [g, y],
-  [g, r],
-  [g, w],
-  [g, o],
-  [y, r],
-  [w, r],
-  [w, o],
-  [y, o],
-  [b, y],
-  [b, r],
-  [b, w],
-  [b, o]
-];
+const edgeColors = [[g, y], [g, r], [g, w], [g, o], [y, r], [w, r], [w, o], [y, o], [b, y], [b, r], [b, w], [b, o]];
 
 class EventEmitter {
   constructor() {
@@ -126,17 +82,13 @@ class EventEmitter {
 class Giiker extends EventEmitter {
   constructor() {
     super();
-    this._onCharacteristicValueChanged = this._onCharacteristicValueChanged.bind(
-      this
-    );
+    this._onCharacteristicValueChanged = this._onCharacteristicValueChanged.bind(this);
     this._onDisconnected = this._onDisconnected.bind(this);
   }
 
   async connect() {
     if (!window.navigator) {
-      throw new Error(
-        "window.navigator is not accesible. Maybe you're running Node.js?"
-      );
+      throw new Error("window.navigator is not accesible. Maybe you're running Node.js?");
     }
 
     if (!window.navigator.bluetooth) {
@@ -158,10 +110,7 @@ class Giiker extends EventEmitter {
     await characteristic.startNotifications();
     const value = await characteristic.readValue();
     this._state = this._parseCubeValue(value).state;
-    characteristic.addEventListener(
-      "characteristicvaluechanged",
-      this._onCharacteristicValueChanged
-    );
+    characteristic.addEventListener("characteristicvaluechanged", this._onCharacteristicValueChanged);
 
     this._systemService = await server.getPrimaryService(SYSTEM_SERVICE_UUID);
 
@@ -189,12 +138,8 @@ class Giiker extends EventEmitter {
    * Returns a promise that will resolve to the battery level
    */
   async getBatteryLevel() {
-    const readCharacteristic = await this._systemService.getCharacteristic(
-      SYSTEM_READ_UUID
-    );
-    const writeCharacteristic = await this._systemService.getCharacteristic(
-      SYSTEM_WRITE_UUID
-    );
+    const readCharacteristic = await this._systemService.getCharacteristic(SYSTEM_READ_UUID);
+    const writeCharacteristic = await this._systemService.getCharacteristic(SYSTEM_WRITE_UUID);
     await readCharacteristic.startNotifications();
     const data = new Uint8Array([0xb5]).buffer;
     writeCharacteristic.writeValue(data);
@@ -202,17 +147,11 @@ class Giiker extends EventEmitter {
     return new Promise(resolve => {
       const listener = event => {
         const value = event.target.value;
-        readCharacteristic.removeEventListener(
-          "characteristicvaluechanged",
-          listener
-        );
+        readCharacteristic.removeEventListener("characteristicvaluechanged", listener);
         readCharacteristic.stopNotifications();
         resolve(value.getUint8(1));
       };
-      readCharacteristic.addEventListener(
-        "characteristicvaluechanged",
-        listener
-      );
+      readCharacteristic.addEventListener("characteristicvaluechanged", listener);
     });
   }
 
@@ -245,21 +184,14 @@ class Giiker extends EventEmitter {
       edges: []
     };
     this._state.cornerPositions.forEach((cp, index) => {
-      const mappedColors = this._mapCornerColors(
-        cornerColors[cp - 1],
-        this._state.cornerOrientations[index],
-        index
-      );
+      const mappedColors = this._mapCornerColors(cornerColors[cp - 1], this._state.cornerOrientations[index], index);
       state.corners.push({
         position: cornerLocations[index].map(f => faces[f]),
         colors: mappedColors.map(c => colors[c])
       });
     });
     this._state.edgePositions.forEach((ep, index) => {
-      const mappedColors = this._mapEdgeColors(
-        edgeColors[ep - 1],
-        this._state.edgeOrientations[index]
-      );
+      const mappedColors = this._mapEdgeColors(edgeColors[ep - 1], this._state.edgeOrientations[index]);
       state.edges.push({
         position: edgeLocations[index].map(f => faces[f]),
         colors: mappedColors.map(c => colors[c])
@@ -274,31 +206,9 @@ class Giiker extends EventEmitter {
    * See https://github.com/ldez/cubejs#cubefromstringstr
    */
   get stateString() {
-    const cornerFaceIndices = [
-      [29, 15, 26],
-      [9, 8, 20],
-      [6, 38, 18],
-      [44, 27, 24],
-      [17, 35, 51],
-      [2, 11, 45],
-      [36, 0, 47],
-      [33, 42, 53]
-    ];
+    const cornerFaceIndices = [[29, 15, 26], [9, 8, 20], [6, 38, 18], [44, 27, 24], [17, 35, 51], [2, 11, 45], [36, 0, 47], [33, 42, 53]];
 
-    const edgeFaceIndices = [
-      [25, 28],
-      [23, 12],
-      [19, 7],
-      [21, 41],
-      [32, 16],
-      [5, 10],
-      [3, 37],
-      [30, 43],
-      [52, 34],
-      [48, 14],
-      [46, 1],
-      [50, 39]
-    ];
+    const edgeFaceIndices = [[25, 28], [23, 12], [19, 7], [21, 41], [32, 16], [5, 10], [3, 37], [30, 43], [52, 34], [48, 14], [46, 1], [50, 39]];
 
     const colorFaceMapping = {
       blue: "B",
@@ -314,15 +224,13 @@ class Giiker extends EventEmitter {
 
     state.corners.forEach((corner, cornerIndex) => {
       corner.position.forEach((face, faceIndex) => {
-        faces[cornerFaceIndices[cornerIndex][faceIndex]] =
-          colorFaceMapping[corner.colors[faceIndex]];
+        faces[cornerFaceIndices[cornerIndex][faceIndex]] = colorFaceMapping[corner.colors[faceIndex]];
       });
     });
 
     state.edges.forEach((edge, edgeIndex) => {
       edge.position.forEach((face, faceIndex) => {
-        faces[edgeFaceIndices[edgeIndex][faceIndex]] =
-          colorFaceMapping[edge.colors[faceIndex]];
+        faces[edgeFaceIndices[edgeIndex][faceIndex]] = colorFaceMapping[edge.colors[faceIndex]];
       });
     });
 
@@ -404,12 +312,7 @@ class Giiker extends EventEmitter {
     const actualColors = [];
 
     if (orientation !== 3) {
-      if (
-        position === 0 ||
-        position === 2 ||
-        position === 5 ||
-        position === 7
-      ) {
+      if (position === 0 || position === 2 || position === 5 || position === 7) {
         orientation = 3 - orientation;
       }
     }
